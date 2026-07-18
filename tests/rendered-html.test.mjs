@@ -22,6 +22,12 @@ test("ships the multi-account Nexora financial product", async () => {
   assert.match(dashboard, /Receitas e despesas/);
   assert.match(dashboard, /CONSULTOR NEXORA/);
   assert.match(dashboard, /Novo lançamento/);
+  assert.match(dashboard, /exportCsv/);
+  assert.match(dashboard, /notificationsOpen/);
+  assert.match(dashboard, /mobileMenuOpen/);
+  assert.match(dashboard, /pendingDelete/);
+  assert.match(dashboard, /Resumo pronto para compartilhar/);
+  assert.match(dashboard, /role="alertdialog"/);
   assert.match(login, /Entre na sua conta/);
   assert.match(login, /\/cadastro/);
   assert.match(register, /Crie seu acesso/);
@@ -35,5 +41,9 @@ test("ships the multi-account Nexora financial product", async () => {
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /\.login-shell/);
   assert.match(css, /\.account-switch/);
+  assert.match(css, /\.notifications-panel/);
+  assert.match(css, /\.report-panel/);
+  assert.match(css, /\.sidebar-open/);
+  assert.match(css, /\.toast/);
   assert.equal(JSON.parse(hosting).d1, "DB");
 });
