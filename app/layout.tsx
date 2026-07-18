@@ -9,23 +9,23 @@ export async function generateMetadata(): Promise<Metadata> {
   const baseUrl = new URL(`${protocol}://${host}`);
   return {
     metadataBase: baseUrl,
-    title: "Lúmina Financeiro | Clareza para sua empresa",
-    description: "Painel financeiro inteligente para pequenas empresas acompanharem receitas, despesas, lucro e oportunidades de economia.",
+    title: "Nexora | Seu negócio, em perspectiva",
+    description: "Centro financeiro para pequenas empresas transformarem movimentações em decisões mais claras.",
     icons: {
-      icon: "/favicon.svg",
-      shortcut: "/favicon.svg",
+      icon: "/og.png",
+      shortcut: "/og.png",
     },
     openGraph: {
-      title: "Lúmina Financeiro",
-      description: "Clareza para decidir melhor.",
+      title: "Nexora",
+      description: "Seu negócio, em perspectiva.",
       type: "website",
       locale: "pt_BR",
-      images: [{ url: new URL("/og.png", baseUrl), width: 1734, height: 907, alt: "Lúmina Financeiro — Clareza para decidir melhor." }],
+      images: [{ url: new URL("/og.png", baseUrl), width: 1734, height: 907, alt: "Nexora — Seu negócio, em perspectiva." }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Lúmina Financeiro",
-      description: "Clareza para decidir melhor.",
+      title: "Nexora",
+      description: "Seu negócio, em perspectiva.",
       images: [new URL("/og.png", baseUrl)],
     },
   };

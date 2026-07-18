@@ -14,6 +14,11 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  vars: {
+    NEXORA_ADMIN_EMAIL: process.env.NEXORA_ADMIN_EMAIL ?? "",
+    NEXORA_PASSWORD_HASH: process.env.NEXORA_PASSWORD_HASH ?? "",
+    NEXORA_SESSION_SECRET: process.env.NEXORA_SESSION_SECRET ?? "",
+  },
   d1_databases: d1
     ? [
         {

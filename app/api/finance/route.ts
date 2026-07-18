@@ -1,4 +1,5 @@
 import { env } from "cloudflare:workers";
+import { readSessionFromRequest } from "../../../lib/auth";
 
 export const runtime = "edge";
 
@@ -69,8 +70,9 @@ function monthLabel(key: string) {
   return new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)));
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    if (!(await readSessionFromRequest(request))) return Response.json({ error: "Sessão expirada." }, { status: 401 });
     await ensureDatabase();
     const result = await env.DB.prepare("SELECT * FROM transactions ORDER BY date DESC, id DESC").all<TransactionRow>();
     const rows = result.results ?? [];
@@ -115,6 +117,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    if (!(await readSessionFromRequest(request))) return Response.json({ error: "Sessão expirada." }, { status: 401 });
     await ensureDatabase();
     const body = (await request.json()) as Record<string, unknown>;
     const type = body.type === "expense" ? "expense" : body.type === "income" ? "income" : "";
@@ -137,6 +140,7 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
+    if (!(await readSessionFromRequest(request))) return Response.json({ error: "Sessão expirada." }, { status: 401 });
     await ensureDatabase();
     const id = Number(new URL(request.url).searchParams.get("id"));
     if (!Number.isInteger(id) || id <= 0) return Response.json({ error: "Lançamento inválido." }, { status: 400 });
