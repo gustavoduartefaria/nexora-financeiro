@@ -96,7 +96,7 @@ function buildInsights(data: DashboardData | null) {
   return insights.slice(0, 3);
 }
 
-export default function Home() {
+export default function Home({ user }: { user: { name: string; email: string } }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -202,8 +202,8 @@ export default function Home() {
             <small>Seu negócio visto por inteiro</small>
           </div>
           <div className="profile">
-            <span className="avatar">AM</span>
-            <span><strong>Minha Empresa</strong><small>Administrador</small></span>
+            <span className="avatar">{user.name.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase()}</span>
+            <span><strong>{user.name}</strong><small>{user.email}</small></span>
             <span>•••</span>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { readSessionFromRequest } from "../../../lib/auth";
+import { isBootstrapAdmin } from "../../../lib/users";
 
 export const runtime = "edge";
 
@@ -12,6 +13,7 @@ type TransactionRow = {
   date: string;
   payment_method: string;
   created_at: string;
+  user_id: number | null;
 };
 
 const seedRows = [
@@ -37,7 +39,7 @@ const seedRows = [
   ["expense", "Custos de fevereiro", "Equipe", 7500, "2026-02-04", "Transferência"],
 ];
 
-async function ensureDatabase() {
+async function ensureDatabase(userId: number, bootstrapAdmin: boolean) {
   if (!env.DB) throw new Error("O banco de dados financeiro ainda não está conectado.");
   await env.DB.prepare(`
     CREATE TABLE IF NOT EXISTS transactions (
@@ -48,18 +50,29 @@ async function ensureDatabase() {
       amount REAL NOT NULL CHECK (amount > 0),
       date TEXT NOT NULL,
       payment_method TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      user_id INTEGER
     )
   `).run();
+  const columns = await env.DB.prepare("PRAGMA table_info(transactions)").all<{ name: string }>();
+  if (!(columns.results ?? []).some((column) => column.name === "user_id")) {
+    await env.DB.prepare("ALTER TABLE transactions ADD COLUMN user_id INTEGER").run();
+  }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS transactions_date_idx ON transactions(date)").run();
-  const count = await env.DB.prepare("SELECT COUNT(*) AS total FROM transactions").first<{ total: number }>();
-  if (!count?.total) {
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS transactions_user_id_idx ON transactions(user_id)").run();
+  if (bootstrapAdmin) {
+    await env.DB.prepare("UPDATE transactions SET user_id = ? WHERE user_id IS NULL").bind(userId).run();
+  }
+  const count = await env.DB.prepare(
+    "SELECT COUNT(*) AS total FROM transactions WHERE user_id = ?"
+  ).bind(userId).first<{ total: number }>();
+  if (bootstrapAdmin && !count?.total) {
     const now = new Date().toISOString();
     await env.DB.batch(
       seedRows.map((row) =>
         env.DB.prepare(
-          "INSERT INTO transactions (type, description, category, amount, date, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).bind(...row, now)
+          "INSERT INTO transactions (type, description, category, amount, date, payment_method, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(...row, now, userId)
       )
     );
   }
@@ -72,9 +85,12 @@ function monthLabel(key: string) {
 
 export async function GET(request: Request) {
   try {
-    if (!(await readSessionFromRequest(request))) return Response.json({ error: "Sessão expirada." }, { status: 401 });
-    await ensureDatabase();
-    const result = await env.DB.prepare("SELECT * FROM transactions ORDER BY date DESC, id DESC").all<TransactionRow>();
+    const session = await readSessionFromRequest(request);
+    if (!session) return Response.json({ error: "Sessão expirada." }, { status: 401 });
+    await ensureDatabase(session.userId, isBootstrapAdmin(session.email));
+    const result = await env.DB.prepare(
+      "SELECT * FROM transactions WHERE user_id = ? ORDER BY date DESC, id DESC"
+    ).bind(session.userId).all<TransactionRow>();
     const rows = result.results ?? [];
     const monthsMap = new Map<string, { revenue: number; expenses: number }>();
     for (const row of rows) {
@@ -117,8 +133,9 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    if (!(await readSessionFromRequest(request))) return Response.json({ error: "Sessão expirada." }, { status: 401 });
-    await ensureDatabase();
+    const session = await readSessionFromRequest(request);
+    if (!session) return Response.json({ error: "Sessão expirada." }, { status: 401 });
+    await ensureDatabase(session.userId, isBootstrapAdmin(session.email));
     const body = (await request.json()) as Record<string, unknown>;
     const type = body.type === "expense" ? "expense" : body.type === "income" ? "income" : "";
     const description = String(body.description ?? "").trim();
@@ -130,8 +147,8 @@ export async function POST(request: Request) {
       return Response.json({ error: "Preencha todos os campos corretamente." }, { status: 400 });
     }
     const result = await env.DB.prepare(
-      "INSERT INTO transactions (type, description, category, amount, date, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).bind(type, description, category, amount, date, paymentMethod, new Date().toISOString()).run();
+      "INSERT INTO transactions (type, description, category, amount, date, payment_method, created_at, user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(type, description, category, amount, date, paymentMethod, new Date().toISOString(), session.userId).run();
     return Response.json({ id: result.meta.last_row_id }, { status: 201 });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Erro ao salvar o lançamento." }, { status: 500 });
@@ -140,11 +157,12 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    if (!(await readSessionFromRequest(request))) return Response.json({ error: "Sessão expirada." }, { status: 401 });
-    await ensureDatabase();
+    const session = await readSessionFromRequest(request);
+    if (!session) return Response.json({ error: "Sessão expirada." }, { status: 401 });
+    await ensureDatabase(session.userId, isBootstrapAdmin(session.email));
     const id = Number(new URL(request.url).searchParams.get("id"));
     if (!Number.isInteger(id) || id <= 0) return Response.json({ error: "Lançamento inválido." }, { status: 400 });
-    await env.DB.prepare("DELETE FROM transactions WHERE id = ?").bind(id).run();
+    await env.DB.prepare("DELETE FROM transactions WHERE id = ? AND user_id = ?").bind(id, session.userId).run();
     return Response.json({ success: true });
   } catch (error) {
     return Response.json({ error: error instanceof Error ? error.message : "Erro ao excluir." }, { status: 500 });

@@ -3,20 +3,19 @@ import { env } from "cloudflare:workers";
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-type SessionPayload = {
+export type SessionPayload = {
+  userId: number;
+  name: string;
   email: string;
   expiresAt: number;
 };
 
-function config() {
+function sessionSecret() {
   const values = env as unknown as Record<string, string | undefined>;
-  const email = values.NEXORA_ADMIN_EMAIL;
-  const passwordHash = values.NEXORA_PASSWORD_HASH;
-  const sessionSecret = values.NEXORA_SESSION_SECRET;
-  if (!email || !passwordHash || !sessionSecret) {
+  if (!values.NEXORA_SESSION_SECRET) {
     throw new Error("A autenticação da Nexora ainda não foi configurada.");
   }
-  return { email, passwordHash, sessionSecret };
+  return values.NEXORA_SESSION_SECRET;
 }
 
 function bytesToHex(bytes: Uint8Array) {
@@ -50,11 +49,32 @@ function constantTimeEqual(a: string, b: string) {
   return difference === 0;
 }
 
+async function derivePassword(password: string, saltHex: string) {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const derived = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(saltHex), iterations: 100_000 },
+    key,
+    256,
+  );
+  return bytesToHex(new Uint8Array(derived));
+}
+
+export async function hashPassword(password: string) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const saltHex = bytesToHex(salt);
+  return `${saltHex}:${await derivePassword(password, saltHex)}`;
+}
+
+export async function verifyPassword(password: string, storedHash: string) {
+  const [saltHex, expectedHash] = storedHash.split(":");
+  if (!saltHex || !expectedHash) return false;
+  return constantTimeEqual(await derivePassword(password, saltHex), expectedHash);
+}
+
 async function sign(value: string) {
-  const { sessionSecret } = config();
   const key = await crypto.subtle.importKey(
     "raw",
-    encoder.encode(sessionSecret),
+    encoder.encode(sessionSecret()),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],
@@ -62,23 +82,11 @@ async function sign(value: string) {
   return toBase64Url(new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value))));
 }
 
-export async function verifyCredentials(email: string, password: string) {
-  const auth = config();
-  if (!constantTimeEqual(email.trim().toLocaleLowerCase("pt-BR"), auth.email.toLocaleLowerCase("pt-BR"))) return false;
-  const [saltHex, expectedHash] = auth.passwordHash.split(":");
-  if (!saltHex || !expectedHash) return false;
-  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const derived = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", hash: "SHA-256", salt: hexToBytes(saltHex), iterations: 100_000 },
-    key,
-    256,
-  );
-  return constantTimeEqual(bytesToHex(new Uint8Array(derived)), expectedHash);
-}
-
-export async function createSessionToken(email: string) {
+export async function createSessionToken(user: { id: number; name: string; email: string }) {
   const payload: SessionPayload = {
-    email,
+    userId: user.id,
+    name: user.name,
+    email: user.email,
     expiresAt: Date.now() + 8 * 60 * 60 * 1000,
   };
   const encodedPayload = toBase64Url(encoder.encode(JSON.stringify(payload)));
@@ -91,7 +99,7 @@ export async function readSessionToken(token?: string) {
     const [payload, signature] = token.split(".");
     if (!payload || !signature || !constantTimeEqual(await sign(payload), signature)) return null;
     const data = JSON.parse(decoder.decode(fromBase64Url(payload))) as SessionPayload;
-    if (!data.email || data.expiresAt <= Date.now()) return null;
+    if (!Number.isInteger(data.userId) || !data.name || !data.email || data.expiresAt <= Date.now()) return null;
     return data;
   } catch {
     return null;
@@ -106,4 +114,8 @@ export async function readSessionFromRequest(request: Request) {
     .find((item) => item.startsWith("nexora_session="))
     ?.slice("nexora_session=".length);
   return readSessionToken(token);
+}
+
+export function sessionCookie(token: string) {
+  return `nexora_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=28800`;
 }

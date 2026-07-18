@@ -9,5 +9,5 @@ export default async function Home() {
   const cookieStore = await cookies();
   const session = await readSessionToken(cookieStore.get("nexora_session")?.value);
   if (!session) redirect("/login");
-  return <Dashboard />;
+  return <Dashboard user={{ name: session.name, email: session.email }} />;
 }

@@ -9,6 +9,15 @@ export const transactions = sqliteTable("transactions", {
   date: text("date").notNull(),
   paymentMethod: text("payment_method").notNull(),
   createdAt: text("created_at").notNull(),
+  userId: integer("user_id"),
+});
+
+export const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at").notNull(),
 });
 
 export const authAttempts = sqliteTable("auth_attempts", {

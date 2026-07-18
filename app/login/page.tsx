@@ -71,8 +71,9 @@ export default function LoginPage() {
               </span>
             </label>
             {error && <p className="login-error" role="alert">{error}</p>}
-            <button className="login-submit" disabled={loading}>{loading ? "Validando..." : "Acessar painel"}<span>→</span></button>
+          <button className="login-submit" disabled={loading}>{loading ? "Validando..." : "Acessar painel"}<span>→</span></button>
           </form>
+          <div className="account-switch">Ainda não tem uma conta? <a href="/cadastro">Criar conta gratuita</a></div>
           <div className="login-help"><span>Ambiente privado da sua empresa</span><span>Suporte Nexora</span></div>
         </div>
       </section>

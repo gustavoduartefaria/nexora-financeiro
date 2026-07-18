@@ -15,6 +15,13 @@
       "when": 1784394231733,
       "tag": "0001_lethal_magma",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784395203931,
+      "tag": "0002_public_loki",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,12 @@
 import { env } from "cloudflare:workers";
-import { createSessionToken, verifyCredentials } from "../../../../lib/auth";
+import { createSessionToken, sessionCookie, verifyPassword } from "../../../../lib/auth";
+import { findUserByEmail } from "../../../../lib/users";
 
 export const runtime = "edge";
 
 async function checkRateLimit(request: Request) {
   const ip = request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for") ?? "local";
-  const fingerprintData = new TextEncoder().encode(ip);
-  const fingerprintHash = await crypto.subtle.digest("SHA-256", fingerprintData);
+  const fingerprintHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
   const fingerprint = Array.from(new Uint8Array(fingerprintHash), (byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 24);
   await env.DB.prepare(`
     CREATE TABLE IF NOT EXISTS auth_attempts (
@@ -32,22 +32,18 @@ export async function POST(request: Request) {
     const body = (await request.json()) as { email?: string; password?: string };
     const email = String(body.email ?? "").trim();
     const password = String(body.password ?? "");
-    const authenticated = await verifyCredentials(email, password);
+    const user = await findUserByEmail(email);
+    const authenticated = Boolean(user && (await verifyPassword(password, user.password_hash)));
     await env.DB.prepare(
       "INSERT INTO auth_attempts (fingerprint, attempted_at, successful) VALUES (?, ?, ?)"
     ).bind(fingerprint, Date.now(), authenticated ? 1 : 0).run();
-    if (!authenticated) {
+    if (!authenticated || !user) {
       return Response.json({ error: "E-mail ou senha incorretos." }, { status: 401 });
     }
-    const token = await createSessionToken(email);
+    const token = await createSessionToken(user);
     return Response.json(
-      { success: true },
-      {
-        headers: {
-          "set-cookie": `nexora_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=28800`,
-          "cache-control": "no-store",
-        },
-      },
+      { success: true, user: { name: user.name, email: user.email } },
+      { headers: { "set-cookie": sessionCookie(token), "cache-control": "no-store" } },
     );
   } catch (error) {
     return Response.json(

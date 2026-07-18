@@ -187,6 +187,17 @@ footer { padding: 24px 0 0; text-align: center; color: #a0aaa5; font-size: 9px; 
 .login-submit span { color: var(--lime); font-size: 19px; }
 .login-help { display: flex; justify-content: space-between; color: #99949f; font-size: 8px; margin-top: 26px; padding-top: 20px; border-top: 1px solid #dfdad1; }
 .login-help span:last-child { color: #6a5ccd; font-weight: 800; }
+.account-switch { margin-top: 22px; padding: 14px; border-radius: 9px; background: #ece8df; color: #716d79; font-size: 10px; text-align: center; }
+.account-switch a { color: #5b4dcc; font-weight: 850; text-decoration: none; margin-left: 3px; }
+.account-switch a:hover { text-decoration: underline; }
+.register-side { padding-top: 34px; padding-bottom: 34px; }
+.register-side .login-seal { margin-bottom: 22px; }
+.register-side .login-intro { margin-bottom: 22px; }
+.register-side .login-card form { gap: 13px; }
+.register-side .account-switch { margin-top: 16px; }
+.register-benefits { display: grid; width: min(520px, 92%); position: relative; z-index: 1; border-top: 1px solid rgba(255,255,255,.11); }
+.register-benefits span { display: flex; align-items: center; gap: 15px; padding: 13px 0; border-bottom: 1px solid rgba(255,255,255,.08); color: #a7a3b8; font-size: 10px; }
+.register-benefits b { color: var(--lime); font-size: 8px; letter-spacing: 1px; }
 
 .modal-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(9, 30, 22, .55); backdrop-filter: blur(4px); display: grid; place-items: center; padding: 20px; }
 .modal { width: min(540px, 100%); background: #fff; border-radius: 18px; padding: 28px; position: relative; box-shadow: 0 30px 80px rgba(0,0,0,.2); animation: modal-in .2s ease-out; }
